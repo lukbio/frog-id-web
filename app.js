@@ -443,14 +443,24 @@ function setupUI() {
   $("file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f || !model) return;
+    if (sampleAudio) { sampleAudio.pause(); sampleAudio = null; }
     await analyzeBuffer(await f.arrayBuffer(), f.name);
     e.target.value = "";
   });
 
+  let sampleAudio = null;
   $("sample").addEventListener("click", async () => {
     const s = samples[Math.floor(Math.random() * samples.length)];
+    // Start playing right away, inside the tap: iPhones only allow sound that a tap starts.
+    if (sampleAudio) sampleAudio.pause();
+    const player = sampleAudio = new Audio(`samples/${s.file}`);
+    player.controls = true;
+    player.className = "player";
+    player.play().catch(() => {}); // if it's blocked, the controls below still work
     const r = await fetch(`samples/${s.file}`);
     await analyzeBuffer(await r.arrayBuffer(), `Sample: ${s.name}`);
+    if (player !== sampleAudio) return; // another sample was tapped meanwhile
+    $("file-result").querySelector("h2").after(player);
     $("file-result").insertAdjacentHTML("beforeend",
       `<p class="muted small">Recording: ${s.attribution} (<a href="${s.url}" target="_blank" rel="noopener">iNaturalist</a>).
       The model was trained on this recording, so it's an easy test: it shows the app works, not how accurate it is.</p>`);
