@@ -1,0 +1,14 @@
+{
+  "name": "Frog ID",
+  "short_name": "Frog ID",
+  "description": "Identify East Texas frogs and toads by their calls. Runs on your phone, works offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1a14",
+  "theme_color": "#0f1a14",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

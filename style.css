@@ -54,6 +54,12 @@ main { max-width: 560px; margin: 0 auto; padding: 14px 16px; }
 .meter { height: 8px; background: var(--raised); border-radius: 4px; margin: 12px auto 0; max-width: 280px; overflow: hidden; }
 .meter div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .meter.quiet div { background: var(--muted); }
+.now-list { list-style: none; margin: 10px auto 0; padding: 0; max-width: 320px; text-align: left; }
+.now-list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 8px; font-weight: 600; }
+.now-list .meter { grid-column: 1 / -1; margin: 0; max-width: none; height: 6px; }
+.pill.live { color: var(--on-accent); background: var(--accent); font-weight: 700; }
+.install ol { margin: .4rem 0; padding-left: 1.3rem; }
+.ok { color: var(--accent); }
 
 button, .ghost { font: inherit; color: inherit; cursor: pointer; }
 .big {

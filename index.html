@@ -7,8 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Frog ID</title>
+  <meta name="apple-mobile-web-app-title" content="Frog ID">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=0.2">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css?v=0.3">
 </head>
 <body>
   <header class="top">
@@ -34,6 +37,7 @@
         <div id="now-title" class="now-title">Tap Listen near some frogs</div>
         <div id="now-sub" class="now-sub muted">Or try a recording below.</div>
         <div id="now-meter" class="meter" hidden><div></div></div>
+        <ul id="now-list" class="now-list"></ul>
       </div>
 
       <button id="listen" class="big" disabled>Listen</button>
@@ -83,7 +87,19 @@
             <option value="0.9">90% sure</option>
           </select>
         </label>
-        <p class="muted small">In testing, at 70% it was right 89% of the time and answered about half the recordings. Lower answers more often but makes more mistakes.</p>
+        <p class="muted small">Each frog gets its own score, so two can pass at once. In testing, at 70% it answered 44% of recordings and was right 90% of the time. Lower answers more often but makes more mistakes.</p>
+      </div>
+      <div class="card install">
+        <h2>Use it offline</h2>
+        <p id="offline-status" class="muted small">Checking…</p>
+        <div id="install-steps">
+          <p class="small">Put it on your Home Screen so it opens like an app, full screen:</p>
+          <ol class="small">
+            <li>In Safari, tap the <b>Share</b> button (square with an arrow).</li>
+            <li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+            <li>Open it once from the new icon while you have signal, so it saves the model there too.</li>
+          </ol>
+        </div>
       </div>
       <div class="card about">
         <h2>About</h2>
@@ -109,9 +125,9 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/dist/tf-core.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu@4.22.0/dist/tf-backend-cpu.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/tf-tflite.min.js"></script>
-  <script type="module" src="app.js?v=0.2"></script>
+  <script src="vendor/tf-core.min.js"></script>
+  <script src="vendor/tf-backend-cpu.min.js"></script>
+  <script src="vendor/tf-tflite.min.js"></script>
+  <script type="module" src="app.js?v=0.3"></script>
 </body>
 </html>
