@@ -26,9 +26,11 @@ trained on about 5,000 iNaturalist frog recordings, plus insects, night birds,
 rain, wind and traffic, gives each species its own score. `model/filter.json` holds
 the range grid (half-degree cells) and calling months.
 
-In cross-validated testing it named the right species 73% of the time on the
-first guess, and was right 90% of the time when at least 70% confident (44% of
-recordings).
+In cross-validated testing it named the right species 74% of the time on the
+first guess, and was right 90% of the time when at least 70% confident (47% of
+recordings). It also trains on made-up mixes of two frogs, so it can name more
+than one; on test mixes it names both 16% of the time, so choruses are still
+its weak spot.
 
 ## Credits and licences
 

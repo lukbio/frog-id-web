@@ -2,7 +2,7 @@
 const SR = 48000;            // BirdNET's sample rate
 const WIN = 3 * SR;          // 3-second windows
 const MAX_FILE_WINDOWS = 20; // analyze the first 60 s of a file
-const VERSION = "0.3";
+const VERSION = "0.4";
 const NOT_FROG = "not_frog";
 const MONTHS = "JFMAMJJASOND";
 
@@ -548,6 +548,11 @@ async function setupOffline() {
   const status = $("offline-status");
   if (!("serviceWorker" in navigator)) { status.textContent = "This browser can't save the app for offline use."; return; }
   try {
+    // A new version took over (sw.js VERSION changed): reload once to use it, unless listening.
+    const hadOld = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadOld && !audio) location.reload();
+    });
     await navigator.serviceWorker.register("sw.js");
     await navigator.serviceWorker.ready;
     const saved = await caches.match("model/birdnet_embed.tflite", { ignoreSearch: true });
