@@ -1,0 +1,146 @@
+[
+ {
+  "label": "acris_blanchardi",
+  "name": "Blanchard's Cricket Frog",
+  "scientific": "Acris blanchardi",
+  "inat_taxon": 70421
+ },
+ {
+  "label": "anaxyrus_americanus",
+  "name": "American Toad",
+  "scientific": "Anaxyrus americanus",
+  "inat_taxon": 64968
+ },
+ {
+  "label": "anaxyrus_fowleri",
+  "name": "Fowler's Toad",
+  "scientific": "Anaxyrus fowleri",
+  "inat_taxon": 64977
+ },
+ {
+  "label": "anaxyrus_woodhousii",
+  "name": "Woodhouse's Toad",
+  "scientific": "Anaxyrus woodhousii",
+  "inat_taxon": 64989
+ },
+ {
+  "label": "anaxyrus_houstonensis",
+  "name": "Houston Toad",
+  "scientific": "Anaxyrus houstonensis",
+  "inat_taxon": 64979
+ },
+ {
+  "label": "incilius_nebulifer",
+  "name": "Gulf Coast Toad",
+  "scientific": "Incilius nebulifer",
+  "inat_taxon": 65849
+ },
+ {
+  "label": "dryophytes_cinereus",
+  "name": "Green Treefrog",
+  "scientific": "Dryophytes cinereus",
+  "inat_taxon": 1668858
+ },
+ {
+  "label": "dryophytes_chrysoscelis",
+  "name": "Cope's Gray Treefrog",
+  "scientific": "Dryophytes chrysoscelis",
+  "inat_taxon": 1668922
+ },
+ {
+  "label": "dryophytes_versicolor",
+  "name": "Gray Treefrog",
+  "scientific": "Dryophytes versicolor",
+  "inat_taxon": 1668923
+ },
+ {
+  "label": "dryophytes_squirellus",
+  "name": "Squirrel Treefrog",
+  "scientific": "Dryophytes squirellus",
+  "inat_taxon": 1668859
+ },
+ {
+  "label": "dryophytes_avivoca",
+  "name": "Bird-voiced Treefrog",
+  "scientific": "Dryophytes avivoca",
+  "inat_taxon": 1668927
+ },
+ {
+  "label": "pseudacris_crucifer",
+  "name": "Spring Peeper",
+  "scientific": "Pseudacris crucifer",
+  "inat_taxon": 24268
+ },
+ {
+  "label": "pseudacris_fouquettei",
+  "name": "Cajun Chorus Frog",
+  "scientific": "Pseudacris fouquettei",
+  "inat_taxon": 66952
+ },
+ {
+  "label": "pseudacris_streckeri",
+  "name": "Strecker's Chorus Frog",
+  "scientific": "Pseudacris streckeri",
+  "inat_taxon": 24257
+ },
+ {
+  "label": "pseudacris_clarkii",
+  "name": "Spotted Chorus Frog",
+  "scientific": "Pseudacris clarkii",
+  "inat_taxon": 24258
+ },
+ {
+  "label": "gastrophryne_carolinensis",
+  "name": "Eastern Narrow-mouthed Toad",
+  "scientific": "Gastrophryne carolinensis",
+  "inat_taxon": 25078
+ },
+ {
+  "label": "gastrophryne_olivacea",
+  "name": "Western Narrow-mouthed Toad",
+  "scientific": "Gastrophryne olivacea",
+  "inat_taxon": 134277
+ },
+ {
+  "label": "lithobates_catesbeianus",
+  "name": "American Bullfrog",
+  "scientific": "Lithobates catesbeianus",
+  "inat_taxon": 65979
+ },
+ {
+  "label": "lithobates_clamitans",
+  "name": "Green Frog (Bronze Frog)",
+  "scientific": "Lithobates clamitans",
+  "inat_taxon": 65982
+ },
+ {
+  "label": "lithobates_sphenocephalus",
+  "name": "Southern Leopard Frog",
+  "scientific": "Lithobates sphenocephalus",
+  "inat_taxon": 60341
+ },
+ {
+  "label": "lithobates_grylio",
+  "name": "Pig Frog",
+  "scientific": "Lithobates grylio",
+  "inat_taxon": 65986
+ },
+ {
+  "label": "lithobates_palustris",
+  "name": "Pickerel Frog",
+  "scientific": "Lithobates palustris",
+  "inat_taxon": 66002
+ },
+ {
+  "label": "lithobates_areolatus",
+  "name": "Crawfish Frog",
+  "scientific": "Lithobates areolatus",
+  "inat_taxon": 65974
+ },
+ {
+  "label": "scaphiopus_hurterii",
+  "name": "Hurter's Spadefoot",
+  "scientific": "Scaphiopus hurterii",
+  "inat_taxon": 26693
+ }
+]

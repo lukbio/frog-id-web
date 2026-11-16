@@ -1,0 +1,66 @@
+[
+ {
+  "file": "dryophytes_cinereus.wav",
+  "label": "dryophytes_cinereus",
+  "name": "Green Treefrog",
+  "attribution": "(c) A. Rector, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/398305470"
+ },
+ {
+  "file": "pseudacris_crucifer.m4a",
+  "label": "pseudacris_crucifer",
+  "name": "Spring Peeper",
+  "attribution": "(c) scincus, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/343558044"
+ },
+ {
+  "file": "lithobates_catesbeianus.m4a",
+  "label": "lithobates_catesbeianus",
+  "name": "American Bullfrog",
+  "attribution": "(c) James Boss, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/358846156"
+ },
+ {
+  "file": "acris_blanchardi.m4a",
+  "label": "acris_blanchardi",
+  "name": "Blanchard's Cricket Frog",
+  "attribution": "(c) Shannon @DirtNKids, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/363048694"
+ },
+ {
+  "file": "incilius_nebulifer.m4a",
+  "label": "incilius_nebulifer",
+  "name": "Gulf Coast Toad",
+  "attribution": "(c) Amanda Gabehart, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/352497395"
+ },
+ {
+  "file": "gastrophryne_carolinensis.m4a",
+  "label": "gastrophryne_carolinensis",
+  "name": "Eastern Narrow-mouthed Toad",
+  "attribution": "(c) Dan Johnson, some rights reserved (CC BY)",
+  "license": "cc-by",
+  "url": "https://www.inaturalist.org/observations/385062114"
+ },
+ {
+  "file": "lithobates_sphenocephalus.m4a",
+  "label": "lithobates_sphenocephalus",
+  "name": "Southern Leopard Frog",
+  "attribution": "(c) s0leil, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/341885545"
+ },
+ {
+  "file": "noise_insects.m4a",
+  "label": "noise_insects",
+  "name": "Insects (not a frog)",
+  "attribution": "(c) averycollazo25, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "url": "https://www.inaturalist.org/observations/287755657"
+ }
+]

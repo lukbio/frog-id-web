@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1a14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Frog ID</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=0.1">
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="icon.svg" alt="" width="28" height="28"> Frog ID <span class="tag">prototype</span></div>
+    <div id="where" class="where" hidden></div>
+  </header>
+
+  <main>
+    <!-- Listen -->
+    <section id="tab-listen" class="tab active">
+      <div id="loading" class="card loading">
+        <div class="loading-text">Loading the frog model…</div>
+        <div class="bar"><div id="load-bar"></div></div>
+        <div id="load-note" class="muted small">About 25 MB the first time, then it's saved on your phone.</div>
+      </div>
+
+      <div class="card spectro-card">
+        <canvas id="spectro" width="600" height="180" aria-label="Live spectrogram"></canvas>
+        <div class="spectro-labels"><span>8 kHz</span><span>4 kHz</span><span>0</span></div>
+      </div>
+
+      <div id="now" class="now">
+        <div id="now-title" class="now-title">Tap Listen near some frogs</div>
+        <div id="now-sub" class="now-sub muted">Or try a recording below.</div>
+        <div id="now-meter" class="meter" hidden><div></div></div>
+      </div>
+
+      <button id="listen" class="big" disabled>Listen</button>
+      <button id="filter-note" class="filter-note" type="button"></button>
+
+      <div class="row-buttons">
+        <label class="ghost" id="file-label">
+          <input id="file" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav" hidden>
+          Analyze a recording
+        </label>
+        <button id="sample" class="ghost" disabled>Try a sample</button>
+      </div>
+
+      <div id="file-result" class="card" hidden></div>
+
+      <h2 id="heard-h" hidden>Heard this session</h2>
+      <ul id="heard" class="heard"></ul>
+    </section>
+
+    <!-- Near me -->
+    <section id="tab-near" class="tab">
+      <div class="card">
+        <h2>Frogs near you this month</h2>
+        <p class="muted small">From iNaturalist sightings within about 50–100 km and the months each frog calls in Texas. With this on, the app won't suggest frogs that can't be there.</p>
+        <label class="switch-row"><input id="use-filter" type="checkbox" checked> Use my location and today's date</label>
+        <button id="locate" class="ghost">Use my location</button>
+        <div id="near-status" class="muted small"></div>
+      </div>
+      <ul id="near-list" class="species-list"></ul>
+    </section>
+
+    <!-- Species -->
+    <section id="tab-species" class="tab">
+      <h2>East Texas frogs and toads</h2>
+      <p class="muted small">Bars show the months each one calls. Tap for photos and recordings on iNaturalist.</p>
+      <ul id="species-list" class="species-list"></ul>
+    </section>
+
+    <!-- About -->
+    <section id="tab-about" class="tab">
+      <div class="card">
+        <h2>Settings</h2>
+        <label class="field">Only name a frog when at least
+          <select id="threshold">
+            <option value="0.5">50% sure</option>
+            <option value="0.7" selected>70% sure</option>
+            <option value="0.9">90% sure</option>
+          </select>
+        </label>
+        <p class="muted small">In testing, at 70% it was right 89% of the time and answered about half the recordings. Lower answers more often but makes more mistakes.</p>
+      </div>
+      <div class="card about">
+        <h2>About</h2>
+        <p>A test of identifying East Texas frogs by their calls. It runs entirely on your phone: sound never leaves the device.</p>
+        <p>It listens in 3-second windows. Each window goes through <b>BirdNET</b> (an animal-sound model from the Cornell Lab of Ornithology and Chemnitz University), then a small classifier trained on about 5,000 frog recordings from iNaturalist, plus insects, night birds, rain, wind and traffic.</p>
+        <p class="muted small">BirdNET V2.4 model: CC BY-NC-SA 4.0. Training recordings: iNaturalist contributors (CC licences) and ESC-50 (CC BY-NC). For research and education only, not for commercial use.</p>
+        <p class="muted small" id="version"></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="listen" class="active">Listen</button>
+    <button data-tab="near">Near me</button>
+    <button data-tab="species">Species</button>
+    <button data-tab="about">Settings</button>
+  </nav>
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-body">
+      <button class="sheet-close" aria-label="Close">×</button>
+      <div id="sheet-content"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/dist/tf-core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu@4.22.0/dist/tf-backend-cpu.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/tf-tflite.min.js"></script>
+  <script type="module" src="app.js?v=0.1"></script>
+</body>
+</html>
