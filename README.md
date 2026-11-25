@@ -10,7 +10,10 @@ Identify East Texas frogs and toads by their calls, in the browser:
   home screen shows a frog of the day.
 - **Explore**: the 24 East Texas frogs and toads (23 in the model; the Houston
   Toad has too few recordings), with photos, search, and month bars showing
-  when each one calls. Frogs likely near you this month come first.
+  when each one calls. Frogs likely near you this month come first. Each frog
+  has its own page: swipe through photos, play its calls, see when it calls,
+  read about it (from Wikipedia), see a range map, share it, or add it to your
+  Life List.
 - **Life List**: frogs you've found (open a frog, tap Add to Life List), plus
   the ones likely nearby that you haven't found yet. Saved on the phone only.
 - **Settings**: confidence, the location and season filter (your location is
