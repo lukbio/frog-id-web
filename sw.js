@@ -1,6 +1,6 @@
 // Service worker: keeps the whole app on the phone so it opens with no signal.
 // Bump VERSION whenever any file below changes, or phones keep the old copy.
-const VERSION = "0.5";
+const VERSION = "0.6";
 const SHELL = `frog-id-shell-${VERSION}`;
 const RUNTIME = "frog-id-runtime"; // sample clips, cached the first time they play
 const FILES = [

@@ -2,7 +2,7 @@
 const SR = 48000;            // BirdNET's sample rate
 const WIN = 3 * SR;          // 3-second windows
 const MAX_FILE_WINDOWS = 20; // analyze the first 60 s of a file
-const VERSION = "0.5";
+const VERSION = "0.6";
 const NOT_FROG = "not_frog";
 const MONTHS = "JFMAMJJASOND";
 
@@ -73,6 +73,7 @@ async function loadAll() {
   prepareClassifier();
   renderAll();
   loadPhotos();
+  route();
 
   tflite.setWasmPath("vendor/");
   const buf = await fetchModel("model/birdnet_embed.tflite", (p) => { bar.style.width = `${Math.round(p * 100)}%`; });
@@ -325,30 +326,201 @@ async function loadPhotos() {
   }
 }
 
-function openSpecies(label) {
+// ---------- a frog's page (#frog=label) ----------
+
+// Simplified Texas outline (lng, lat), for the range map.
+const TEXAS = [[-106.62, 32.0], [-103.06, 32.0], [-103.04, 36.5], [-100.0, 36.5], [-100.0, 34.56], [-99.2, 34.37], [-98.1, 34.13],
+  [-97.1, 33.73], [-96.3, 33.76], [-95.3, 33.87], [-94.48, 33.64], [-94.04, 33.55], [-94.04, 32.0], [-93.8, 31.5], [-93.55, 31.0],
+  [-93.57, 30.4], [-93.72, 30.06], [-93.84, 29.7], [-94.5, 29.5], [-94.9, 29.3], [-95.3, 28.9], [-96.0, 28.6], [-96.6, 28.3],
+  [-97.0, 27.9], [-97.3, 27.4], [-97.4, 26.8], [-97.15, 25.95], [-97.5, 25.9], [-98.0, 26.05], [-98.5, 26.2], [-99.1, 26.5],
+  [-99.4, 27.0], [-99.5, 27.5], [-100.0, 28.1], [-100.3, 28.6], [-100.6, 29.1], [-101.0, 29.5], [-101.4, 29.77], [-102.0, 29.8],
+  [-102.4, 29.77], [-102.7, 29.6], [-102.9, 29.2], [-103.2, 28.98], [-103.6, 29.16], [-104.0, 29.3], [-104.5, 29.7], [-104.7, 30.2],
+  [-105.0, 30.7], [-105.6, 31.1], [-106.2, 31.5], [-106.5, 31.78]];
+const ABOUT_DAYS = 30;
+let frogPlayer = null;   // the one Audio element playing a call
+let pageScroll = 0;      // where the list was, to go back to it
+
+// Extra photos, a description and recordings for one frog, from iNaturalist, saved for 30 days.
+async function frogDetails(s) {
+  const key = `taxon:${s.inat_taxon}`;
+  const saved = store.get(key, null);
+  if (saved && saved.v === 1 && Date.now() - saved.t < ABOUT_DAYS * 864e5) return saved;
+  if (!s.inat_taxon) return null;
+  try {
+    const [t, o] = await Promise.all([
+      fetch(`https://api.inaturalist.org/v1/taxa/${s.inat_taxon}`).then((r) => r.json()),
+      fetch(`https://api.inaturalist.org/v1/observations?taxon_id=${s.inat_taxon}&sounds=true&place_id=18&quality_grade=research&order_by=votes&per_page=12`).then((r) => r.json()),
+    ]);
+    const taxon = t.results[0] || {};
+    const pics = (taxon.taxon_photos || []).map((x) => x.photo)
+      .filter((p) => p && p.license_code && p.medium_url).slice(0, 8)
+      .map((p) => ({ url: p.medium_url.replace(/\/medium\./, "/large."), attribution: p.attribution }));
+    const sounds = [];
+    for (const ob of o.results || []) {
+      const snd = (ob.sounds || []).find((x) => x.license_code && x.file_url);
+      if (snd) sounds.push({ url: snd.file_url, attribution: snd.attribution, date: ob.observed_on || "", where: ob.place_guess || "", obs: ob.id });
+      if (sounds.length === 3) break;
+    }
+    const text = taxon.wikipedia_summary ? new DOMParser().parseFromString(taxon.wikipedia_summary, "text/html").body.textContent.trim() : "";
+    const d = { v: 1, t: Date.now(), pics, sounds, text, wiki: taxon.wikipedia_url || "" };
+    store.set(key, d);
+    return d;
+  } catch {
+    return saved; // offline: whatever we had, even if old
+  }
+}
+
+function rangeMap(label) {
+  const k = filt.species.indexOf(label);
+  const kx = Math.cos(31 * Math.PI / 180) * 20, ky = 20; // px per degree
+  const W = filt.cols * filt.cell * kx, H = filt.rows * filt.cell * ky;
+  const X = (lng) => (lng - filt.lng0) * kx, Y = (lat) => H - (lat - filt.lat0) * ky;
+  let cells = "";
+  for (let r = 0; r < filt.rows; r++) for (let c = 0; c < filt.cols; c++) {
+    if (filt.cells[r][c].includes(k)) {
+      cells += `M${(c * filt.cell * kx).toFixed(1)} ${(H - (r + 1) * filt.cell * ky).toFixed(1)}h${(filt.cell * kx).toFixed(1)}v${(filt.cell * ky).toFixed(1)}h-${(filt.cell * kx).toFixed(1)}z`;
+    }
+  }
+  const outline = TEXAS.map(([lng, lat]) => `${X(lng).toFixed(1)},${Y(lat).toFixed(1)}`).join(" ");
+  const me = place && cellOf(place.lat, place.lng)
+    ? `<circle class="me" cx="${X(place.lng).toFixed(1)}" cy="${Y(place.lat).toFixed(1)}" r="6"/>` : "";
+  return `<svg class="range" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" role="img" aria-label="Map of where ${speciesBy[label].name} has been seen in and around Texas">
+    <path class="cells" d="${cells}" shape-rendering="crispEdges"/><polygon class="tx" points="${outline}"/>${me}</svg>`;
+}
+
+function soundRow(src, title, sub, i) {
+  return `<li><button class="call" data-src="${esc(src)}" type="button" aria-label="Play ${esc(title)}">
+    <span class="play"><svg><use href="#i-play"/></svg></span>
+    <span><b>${esc(title)}</b><span class="muted small">${sub}</span></span></button></li>`;
+}
+
+function renderFrog(label, d) {
   const s = speciesBy[label];
-  if (!s) return;
+  const ok = likelyNow().has(label);
+  const m = filt.months[label];
+  const max = Math.max(1, ...m.counts);
+  const nowM = new Date().getMonth();
+  const pics = d && d.pics && d.pics.length ? d.pics : (photos[label] ? [{ url: photos[label].url, attribution: photos[label].attribution }] : []);
+  const sample = samples.find((x) => x.label === label);
+  const calls = [];
+  if (sample) calls.push(soundRow(`samples/${sample.file}`, "Calls", `Works offline · ${esc(sample.attribution)}`));
+  for (const x of (d && d.sounds) || []) {
+    const when = x.date ? new Date(`${x.date}T12:00`).toLocaleDateString([], { month: "short", year: "numeric" }) : "";
+    calls.push(soundRow(x.url, "Calls", [when, x.where && esc(x.where.split(",").slice(-2).join(",").trim())].filter(Boolean).join(" · ") + `<br>${esc(x.attribution)}`));
+  }
+  const where = place ? (cellOf(place.lat, place.lng) ? "near you" : "in East Texas") : "in East Texas";
   const taxon = s.inat_taxon;
-  const link = taxon ? `https://www.inaturalist.org/taxa/${taxon}` : `https://www.inaturalist.org/search?q=${encodeURIComponent(s.scientific)}`;
-  const sounds = taxon ? `https://www.inaturalist.org/observations?taxon_id=${taxon}&sounds=true&place_id=18&quality_grade=research` : link;
-  const counts = filt.months[label].counts;
-  const max = Math.max(1, ...counts);
-  const ph = photos[label];
+  const inatSounds = taxon ? `https://www.inaturalist.org/observations?taxon_id=${taxon}&sounds=true&place_id=18&quality_grade=research` : "#";
   const added = life[label];
-  $("sheet-content").innerHTML = `
-    <div class="sheet-photo ph">${photo(label)}</div>
-    ${ph ? `<p class="credit">Photo ${esc(ph.attribution)}, via iNaturalist</p>` : ""}
-    <h2>${s.name}</h2><p class="sci">${s.scientific}</p>
-    ${clf.classes.includes(label) ? "" : `<span class="pill warn">The app can't identify this one yet: too few recordings.</span>`}
-    <div class="hist">${counts.map((c, i) => `<div><span style="height:${Math.round(60 * c / max)}px"></span><b>${MONTHS[i]}</b></div>`).join("")}</div>
-    <p class="muted small">${filt.months[label].source === "calling records" ? "Texas recordings of it calling, by month." : filt.months[label].source === "southern US calling records" ? "Recordings of it calling across the southern US, by month (few in Texas)." : "Texas sightings by month (very few recordings)."}</p>
-    <button class="btn ${added ? "done" : "primary"}" id="life-toggle" data-label="${label}" type="button">${added
+  $("frog-title").textContent = s.name;
+  $("frog-page").innerHTML = `
+    <div class="gallery" id="gallery">${pics.length ? pics.map((p, i) =>
+      `<div class="slide"><img src="${esc(p.url)}" alt="${i ? "" : esc(s.name)}" ${i ? 'loading="lazy"' : ""} onerror="this.remove()"></div>`).join("")
+      : `<div class="slide ph"><svg class="ph-icon"><use href="#i-frog"/></svg></div>`}</div>
+    <div class="gallery-cap"><span id="pic-credit">${pics.length ? esc(pics[0].attribution) : (navigator.onLine ? "No photo yet" : "Photos load when you're online")}</span><span id="pic-count">${pics.length > 1 ? `1 of ${pics.length}` : ""}</span></div>
+
+    <div class="frog-body">
+      <div class="frog-name">
+        <div><h1>${s.name}</h1><p class="sci">${s.scientific}</p></div>
+        ${calls.length ? `<button class="round" id="frog-hear" type="button" aria-label="Play its call"><svg><use href="#i-speaker"/></svg></button>` : ""}
+      </div>
+      ${clf.classes.includes(label) ? "" : `<p class="pill warn">The app can't identify this one yet: too few recordings.</p>`}
+      <hr>
+      <h2 class="likely">${ok ? `<span class="ok">Likely</span> calling ${where} in ${monthName()}` : `<span class="muted">Not expected</span> ${where} in ${monthName()}`}</h2>
+      <div class="hist big">${m.counts.map((c, i) => `<div class="${m.on[i] ? "on" : ""}${i === nowM ? " cur" : ""}"><span style="height:${Math.max(m.on[i] ? 6 : 3, Math.round(100 * c / max))}px"></span><b>${MONTHS[i]}</b></div>`).join("")}</div>
+      <p class="muted small">${m.source === "calling records" ? `Recordings of it calling in Texas, by month (${m.counts.reduce((a, b) => a + b, 0)} in all).` : m.source === "southern US calling records" ? "Recordings of it calling across the southern US, by month (few in Texas)." : "Texas sightings by month (very few recordings)."}</p>
+
+      ${d && d.text ? `<h2 class="section-h">About</h2><p class="about-text">${esc(d.text)}</p>
+        <p class="muted small">From <a href="${esc(d.wiki)}" target="_blank" rel="noopener">Wikipedia</a>, CC BY-SA.</p>` : ""}
+
+      <h2 class="section-h">Sounds</h2>
+      ${calls.length ? `<ul class="calls">${calls.join("")}</ul>` : `<p class="muted">${navigator.onLine ? "No recordings to play yet." : "Recordings load when you're online."}</p>`}
+      <a class="btn outline" href="${inatSounds}" target="_blank" rel="noopener">Explore all Texas recordings</a>
+
+      <h2 class="section-h">Range</h2>
+      ${rangeMap(label)}
+      <div class="legend"><span><i class="sw seen"></i>Seen within this square (iNaturalist)</span>${place && cellOf(place.lat, place.lng) ? `<span><i class="sw you"></i>You</span>` : ""}</div>
+      <p class="muted small">Each square is half a degree, about 50 km. The outline is Texas.</p>
+      <a class="btn outline" href="https://www.inaturalist.org/taxa/${taxon}" target="_blank" rel="noopener">Photos and info on iNaturalist</a>
+    </div>
+    <div class="frog-cta"><button class="btn ${added ? "done" : "primary"}" id="life-toggle" data-label="${label}" type="button">${added
       ? `✓ On your Life List · ${new Date(added).toLocaleDateString([], { month: "short", day: "numeric" })}`
-      : "Add to Life List"}</button>
-    <a class="btn" href="${link}" target="_blank" rel="noopener">Photos and info on iNaturalist</a>
-    <a class="btn" href="${sounds}" target="_blank" rel="noopener">Hear Texas recordings</a>`;
-  $("sheet").hidden = false;
-  $("sheet").querySelector(".sheet-body").scrollTop = 0;
+      : "Add to Life List"}</button></div>`;
+
+  const g = $("gallery");
+  g.addEventListener("scroll", () => {
+    const i = Math.round(g.scrollLeft / g.clientWidth);
+    if (pics[i]) { $("pic-credit").textContent = pics[i].attribution; $("pic-count").textContent = `${i + 1} of ${pics.length}`; }
+  }, { passive: true });
+  if ($("frog-hear")) $("frog-hear").addEventListener("click", () => $("frog-page").querySelector(".call").click());
+}
+
+async function showFrog(label) {
+  if (!speciesBy[label]) return;
+  if (!document.body.classList.contains("frog-open")) pageScroll = window.scrollY;
+  document.body.classList.add("frog-open");
+  $("frog-page").hidden = false;
+  $("frog-bar").hidden = false;
+  window.scrollTo(0, 0);
+  const s = speciesBy[label];
+  const cached = store.get(`taxon:${s.inat_taxon}`, null);
+  renderFrog(label, cached);
+  const d = await frogDetails(s);
+  if (d && d !== cached && currentFrog() === label) renderFrog(label, d);
+}
+
+function hideFrog() {
+  frogFromApp = false;
+  stopCall();
+  document.body.classList.remove("frog-open", "frog-scrolled");
+  $("frog-page").hidden = true;
+  $("frog-bar").hidden = true;
+  $("frog-page").innerHTML = "";
+  window.scrollTo(0, pageScroll);
+}
+
+const currentFrog = () => (location.hash.startsWith("#frog=") ? decodeURIComponent(location.hash.slice(6)) : null);
+
+function route() {
+  const l = currentFrog();
+  if (l) showFrog(l); else if (document.body.classList.contains("frog-open")) hideFrog();
+}
+
+let frogFromApp = false; // opened by a tap here (so Back can go back), not from a shared link
+
+function openSpecies(label) {
+  if (currentFrog() === label) return;
+  frogFromApp = true;
+  location.hash = `frog=${encodeURIComponent(label)}`; // a history entry, so the phone's back gesture works too
+}
+
+function closeFrog() {
+  if (frogFromApp) history.back();
+  else { history.replaceState(null, "", location.pathname + location.search); route(); }
+}
+
+function stopCall() {
+  if (frogPlayer) { frogPlayer.pause(); frogPlayer = null; }
+  document.querySelectorAll(".call.playing").forEach((b) => b.classList.remove("playing"));
+}
+
+function playCall(btn) {
+  const was = btn.classList.contains("playing");
+  stopCall();
+  if (was) return;
+  const a = frogPlayer = new Audio(btn.dataset.src);
+  btn.classList.add("playing");
+  a.addEventListener("ended", () => { if (frogPlayer === a) stopCall(); });
+  a.play().catch(() => { if (frogPlayer === a) stopCall(); });
+}
+
+async function shareFrog() {
+  const s = speciesBy[currentFrog()];
+  const url = location.href;
+  try {
+    if (navigator.share) await navigator.share({ title: `${s.name} · Frog ID`, url });
+    else { await navigator.clipboard.writeText(url); alert("Link copied."); }
+  } catch {}
 }
 
 function toggleLife(label) {
@@ -358,7 +530,10 @@ function toggleLife(label) {
   } else life[label] = new Date().toISOString();
   store.set("life", life);
   renderLife();
-  openSpecies(label);
+  const b = $("life-toggle");
+  const added = life[label];
+  b.className = `btn ${added ? "done" : "primary"}`;
+  b.textContent = added ? `✓ On your Life List · ${new Date(added).toLocaleDateString([], { month: "short", day: "numeric" })}` : "Add to Life List";
 }
 
 // ---------- results ----------
@@ -616,6 +791,7 @@ async function analyzeBuffer(arrayBuffer, title) {
 // ---------- wiring ----------
 
 function showTab(name) {
+  if (currentFrog()) { history.replaceState(null, "", location.pathname + location.search); hideFrog(); }
   document.querySelectorAll(".tabbar button").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.id === `tab-${name}`));
   document.body.dataset.tab = name;
@@ -645,10 +821,17 @@ function setupUI() {
     const lt = e.target.closest("#life-toggle");
     if (lt) toggleLife(lt.dataset.label);
   });
-  $("sheet").addEventListener("click", (e) => {
-    if (e.target.id === "sheet" || e.target.classList.contains("sheet-close")) $("sheet").hidden = true;
+  document.body.addEventListener("click", (e) => {
+    const c = e.target.closest(".call");
+    if (c) playCall(c);
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("sheet").hidden = true; });
+  $("frog-back").addEventListener("click", closeFrog);
+  $("frog-share").addEventListener("click", shareFrog);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && currentFrog()) closeFrog(); });
+  window.addEventListener("hashchange", route);
+  window.addEventListener("scroll", () => {
+    document.body.classList.toggle("frog-scrolled", document.body.classList.contains("frog-open") && window.scrollY > window.innerWidth * .62);
+  }, { passive: true });
 
   $("listen").addEventListener("click", toggleListen);
   $("listen-home").addEventListener("click", toggleListen);
