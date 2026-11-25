@@ -3,15 +3,21 @@
 Identify East Texas frogs and toads by their calls, in the browser:
 **https://lukbio.github.io/frog-id-web/**
 
-- **Listen**: hold your phone up to a chorus. Every 3 seconds it names every
-  frog that passes the confidence setting (or says "not sure" / "no frog"),
-  with a live spectrogram and a list of what it heard this session.
-- **Analyze a recording**: pick an audio file (m4a, mp3, wav) and get an answer
-  for every 3 seconds plus an overall top 3.
-- **Near me**: uses your location (rounded, kept on your phone) and today's
-  date to rule out frogs with no sightings nearby or that don't call this month.
-- **Species**: the 24 East Texas frogs and toads (23 in the model; the Houston Toad has too few recordings), with calling seasons and
-  links to iNaturalist.
+- **Identify**: tap the microphone and hold your phone up to a chorus. Every 3
+  seconds it names every frog that passes the confidence setting (or says
+  "not sure" / "no frog"), with a live spectrogram and a list of what it heard
+  this session. Or analyze a recording (m4a, mp3, wav) or play a sample. The
+  home screen shows a frog of the day.
+- **Explore**: the 24 East Texas frogs and toads (23 in the model; the Houston
+  Toad has too few recordings), with photos, search, and month bars showing
+  when each one calls. Frogs likely near you this month come first.
+- **Life List**: frogs you've found (open a frog, tap Add to Life List), plus
+  the ones likely nearby that you haven't found yet. Saved on the phone only.
+- **Settings**: confidence, the location and season filter (your location is
+  rounded and kept on your phone), scientific names, and offline status.
+
+Photos come from iNaturalist (Creative Commons-licensed photos only, credited
+on each frog's page). They load the first time you open the app with signal.
 
 Everything runs on the device. Audio is never uploaded. After the first visit
 it works with no signal, and Safari's Share → Add to Home Screen turns it into

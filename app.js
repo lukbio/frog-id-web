@@ -2,7 +2,7 @@
 const SR = 48000;            // BirdNET's sample rate
 const WIN = 3 * SR;          // 3-second windows
 const MAX_FILE_WINDOWS = 20; // analyze the first 60 s of a file
-const VERSION = "0.4";
+const VERSION = "0.5";
 const NOT_FROG = "not_frog";
 const MONTHS = "JFMAMJJASOND";
 
@@ -16,6 +16,10 @@ let model, clf, filt, species, speciesBy, samples = [];
 let answers = [], toAnswer = [], noiseIdx = [];
 let place = store.get("place", null);   // {lat, lng}
 let threshold = store.get("threshold", 0.7);
+let useFilter = store.get("useFilter", true);
+let showSci = store.get("showSci", false);
+let life = store.get("life", {});       // label -> ISO date it was added
+let photos = {};                        // label -> {url, attribution} (CC-licensed iNaturalist photos)
 
 // ---------- loading ----------
 
@@ -67,8 +71,8 @@ async function loadAll() {
   try { samples = await fetchJSON("samples/samples.json"); } catch { samples = []; }
   speciesBy = Object.fromEntries(species.map((s) => [s.label, s]));
   prepareClassifier();
-  renderSpecies();
-  renderNear();
+  renderAll();
+  loadPhotos();
 
   tflite.setWasmPath("vendor/");
   const buf = await fetchModel("model/birdnet_embed.tflite", (p) => { bar.style.width = `${Math.round(p * 100)}%`; });
@@ -78,6 +82,7 @@ async function loadAll() {
   embed(new Float32Array(WIN));
   $("loading").hidden = true;
   $("listen").disabled = false;
+  $("listen-home").disabled = false;
   $("sample").disabled = samples.length === 0;
 }
 
@@ -169,16 +174,40 @@ function allowedSet(lat, lng, month) {
 }
 
 function filterSet() {
-  if (!$("use-filter").checked) return null;
+  if (!useFilter) return null;
+  return likelyNow();
+}
+
+// Frogs possible here (or anywhere in the grid) this month, whatever the filter setting.
+function likelyNow() {
   const month = new Date().getMonth() + 1;
   return allowedSet(place ? place.lat : null, place ? place.lng : null, month);
 }
 
-function seasonBar(label) {
-  const on = filt.months[label].on;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const MONTH_NAMES = "JanFebMarAprMayJunJulAugSepOctNovDec";
+const monthName = () => new Date().toLocaleString("en-US", { month: "long" });
+const placeName = () => (place ? (cellOf(place.lat, place.lng) ? "near you" : "in East Texas") : "in East Texas");
+
+// Month bars: height follows how many calling records there are each month,
+// dark where it calls, with today's month marked.
+function monthBars(label) {
+  const m = filt.months[label];
+  const max = Math.max(1, ...m.counts);
   const now = new Date().getMonth();
-  return `<span class="season" aria-label="Calls in ${on.map((x, i) => (x ? "JanFebMarAprMayJunJulAugSepOctNovDec".slice(i * 3, i * 3 + 3) : null)).filter(Boolean).join(", ")}">${
-    on.map((x, i) => `<i class="${x ? "on" : ""}${i === now ? " now" : ""}">${MONTHS[i]}</i>`).join("")}</span>`;
+  const said = m.on.map((x, i) => (x ? MONTH_NAMES.slice(i * 3, i * 3 + 3) : null)).filter(Boolean).join(", ");
+  return `<span class="months" role="img" aria-label="Calls in ${said}">${m.counts.map((c, i) =>
+    `<i class="${m.on[i] ? "on" : ""}${i === now ? " cur" : ""}"><span style="height:${m.on[i] ? Math.max(5, Math.round(18 * Math.sqrt(c / max))) : 3}px"></span></i>`).join("")}</span>
+    <span class="months-labels" aria-hidden="true">${[...MONTHS].map((x) => `<b>${x}</b>`).join("")}</span>`;
+}
+
+// A photo, or a plain tile with a frog drawn on it (offline, or no CC-licensed photo).
+function photo(label, size = "medium") {
+  const ph = photos[label];
+  const frog = `<svg class="ph-icon"><use href="#i-frog"/></svg>`;
+  if (!ph) return frog;
+  const url = size === "medium" ? ph.url : ph.url.replace(/\/medium\./, `/${size}.`);
+  return `${frog}<img src="${esc(url)}" alt="" loading="lazy" onerror="this.remove()">`;
 }
 
 // ---------- rendering ----------
@@ -188,34 +217,112 @@ function nameOf(label) {
 }
 
 function speciesRow(s, extra = "") {
-  return `<li><button class="sp" data-label="${s.label}">
-    <span class="sp-name">${s.name}<em>${s.scientific}</em></span>${extra}${seasonBar(s.label)}</button></li>`;
+  return `<li><button class="sp" data-label="${s.label}" type="button">
+    <span class="thumb ph">${photo(s.label, "small")}</span>
+    <span class="sp-body">
+      <span class="sp-name">${s.name}${showSci ? `<em>${s.scientific}</em>` : ""}</span>${extra}
+      <span>${monthBars(s.label)}</span>
+    </span></button></li>`;
 }
 
-function renderSpecies() {
-  const inModel = new Set(clf.classes);
-  $("species-list").innerHTML = species.map((s) =>
-    speciesRow(s, inModel.has(s.label) ? "" : `<span class="pill warn">not enough data yet</span>`)).join("");
+function renderAll() {
+  renderHome();
+  renderExplore();
+  renderLife();
+  renderSettings();
 }
 
-function renderNear() {
-  const month = new Date().getMonth() + 1;
-  const monthName = new Date().toLocaleString("en-US", { month: "long" });
-  const ok = allowedSet(place ? place.lat : null, place ? place.lng : null, month);
+function renderHome() {
+  const ok = likelyNow();
   const list = species.filter((s) => ok.has(s.label));
-  let status;
-  if (!place) status = `No location yet, so this is every frog that calls in Texas in ${monthName}.`;
-  else if (!cellOf(place.lat, place.lng)) status = `You're outside Texas, so only the season is used.`;
-  else status = `${list.length} of ${species.length} frogs are possible near you in ${monthName}.`;
-  $("near-status").textContent = status;
-  $("near-list").innerHTML = list.map((s) => speciesRow(s)).join("") ||
-    `<li class="muted">None expected right now. Frogs mostly call on warm, rainy nights.</li>`;
+  $("calling-count").textContent = `${list.length} calling in ${monthName()} ${placeName()}`;
+  // Frog of the day: one of this month's frogs (any frog if none), the same all day.
+  const pool = (list.length ? list : species).filter((s) => photos[s.label]);
+  const from = pool.length ? pool : (list.length ? list : species);
+  const d = new Date();
+  const day = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
+  const s = from[day % from.length];
+  $("hero").dataset.label = s.label;
+  $("hero-name").textContent = s.name;
+  $("hero-img").innerHTML = photo(s.label);
   const fn = $("filter-note");
-  fn.textContent = $("use-filter").checked
-    ? `Filter on: only ${list.length} frog${list.length === 1 ? "" : "s"} possible ${place ? "near you" : "in Texas"} in ${monthName}. Testing with a recording played from a speaker? Tap to turn it off.`
+  fn.textContent = useFilter
+    ? `Filter on: only the ${list.length} frog${list.length === 1 ? "" : "s"} that call ${placeName()} in ${monthName()} can be suggested. Testing with a recording played from a speaker? Tap to change.`
     : "Filter off: any frog can be suggested. Tap to change.";
-  $("where").hidden = !place;
-  if (place) $("where").textContent = `📍 ${place.lat.toFixed(2)}, ${place.lng.toFixed(2)}`;
+}
+
+function renderExplore() {
+  const ok = likelyNow();
+  const q = $("search").value.trim().toLowerCase();
+  const inModel = new Set(clf.classes);
+  const match = (s) => !q || s.name.toLowerCase().includes(q) || s.scientific.toLowerCase().includes(q);
+  const likely = species.filter((s) => ok.has(s.label) && match(s));
+  const other = species.filter((s) => !ok.has(s.label) && match(s));
+  const extra = (s) => (inModel.has(s.label) ? "" : `<span class="pill warn">can't identify yet: too few recordings</span>`);
+  let status = `${ok.size} likely in ${monthName()} ${placeName()}`;
+  if (place && !cellOf(place.lat, place.lng)) status += " (you're outside the map, so only the season is used)";
+  $("near-status").textContent = status;
+  $("explore-list").innerHTML =
+    likely.map((s) => speciesRow(s, extra(s))).join("") +
+    (other.length ? `<li class="list-h">Not calling ${placeName()} right now</li>` + other.map((s) => speciesRow(s, extra(s))).join("") : "") ||
+    `<li class="muted">No frog matches “${esc(q)}”.</li>`;
+}
+
+function renderLife() {
+  const mine = Object.entries(life).sort((a, b) => b[1].localeCompare(a[1]));
+  $("life-sub").textContent = mine.length
+    ? `${mine.length} of ${species.length} East Texas frogs`
+    : "Add your first frog!";
+  $("life-list").innerHTML = mine.filter(([l]) => speciesBy[l]).map(([l, when]) =>
+    speciesRow(speciesBy[l], `<span class="sp-meta">Added ${new Date(when).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>`)).join("");
+  const ok = likelyNow();
+  const todo = species.filter((s) => ok.has(s.label) && !life[s.label]);
+  $("find-sub").textContent = `Likely in ${monthName()} ${placeName()}`;
+  $("find-grid").innerHTML = todo.map((s) => `<button class="cell" data-label="${s.label}" type="button">
+      <span class="cell-img ph">${photo(s.label)}</span>
+      <span class="cell-cap"><b>${s.name}</b><em>${s.scientific}</em></span></button>`).join("") ||
+    `<p class="muted">You've found every frog that calls here this month.</p>`;
+}
+
+function renderSettings() {
+  $("use-filter").checked = useFilter;
+  $("show-sci").checked = showSci;
+  $("place-value").textContent = place ? `${place.lat.toFixed(2)}, ${place.lng.toFixed(2)} ›` : "Not set ›";
+}
+
+function locate() {
+  $("place-value").textContent = "Finding you…";
+  navigator.geolocation.getCurrentPosition((pos) => {
+    // Rounded to ~1 km; it's only used on this phone.
+    place = { lat: Math.round(pos.coords.latitude * 100) / 100, lng: Math.round(pos.coords.longitude * 100) / 100 };
+    store.set("place", place);
+    renderAll();
+  }, (err) => {
+    $("place-value").textContent = "Couldn't get it";
+    alert(`Couldn't get your location (${err.message}).`);
+  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 3600e3 });
+}
+
+// Photos: one iNaturalist API call, keeping only Creative Commons photos, saved on the phone.
+async function loadPhotos() {
+  const saved = store.get("photos", null);
+  if (saved && saved.v === 1 && Date.now() - saved.t < 30 * 864e5) { photos = saved.data; renderAll(); return; }
+  const ids = species.map((s) => s.inat_taxon).filter(Boolean);
+  try {
+    const r = await fetch(`https://api.inaturalist.org/v1/taxa/${ids.join(",")}?per_page=${ids.length}`);
+    if (!r.ok) throw new Error(r.status);
+    const byTaxon = {};
+    for (const t of (await r.json()).results) {
+      const p = t.default_photo;
+      if (p && p.license_code && p.medium_url) byTaxon[t.id] = { url: p.medium_url, attribution: p.attribution };
+    }
+    photos = {};
+    for (const s of species) if (byTaxon[s.inat_taxon]) photos[s.label] = byTaxon[s.inat_taxon];
+    store.set("photos", { v: 1, t: Date.now(), data: photos });
+    renderAll();
+  } catch (e) {
+    if (saved && saved.data) { photos = saved.data; renderAll(); } // offline: keep the old ones
+  }
 }
 
 function openSpecies(label) {
@@ -226,13 +333,32 @@ function openSpecies(label) {
   const sounds = taxon ? `https://www.inaturalist.org/observations?taxon_id=${taxon}&sounds=true&place_id=18&quality_grade=research` : link;
   const counts = filt.months[label].counts;
   const max = Math.max(1, ...counts);
+  const ph = photos[label];
+  const added = life[label];
   $("sheet-content").innerHTML = `
-    <h2>${s.name}</h2><p class="muted"><em>${s.scientific}</em></p>
+    <div class="sheet-photo ph">${photo(label)}</div>
+    ${ph ? `<p class="credit">Photo ${esc(ph.attribution)}, via iNaturalist</p>` : ""}
+    <h2>${s.name}</h2><p class="sci">${s.scientific}</p>
+    ${clf.classes.includes(label) ? "" : `<span class="pill warn">The app can't identify this one yet: too few recordings.</span>`}
     <div class="hist">${counts.map((c, i) => `<div><span style="height:${Math.round(60 * c / max)}px"></span><b>${MONTHS[i]}</b></div>`).join("")}</div>
     <p class="muted small">${filt.months[label].source === "calling records" ? "Texas recordings of it calling, by month." : filt.months[label].source === "southern US calling records" ? "Recordings of it calling across the southern US, by month (few in Texas)." : "Texas sightings by month (very few recordings)."}</p>
-    <a class="ghost block" href="${link}" target="_blank" rel="noopener">Photos and info on iNaturalist</a>
-    <a class="ghost block" href="${sounds}" target="_blank" rel="noopener">Hear Texas recordings</a>`;
+    <button class="btn ${added ? "done" : "primary"}" id="life-toggle" data-label="${label}" type="button">${added
+      ? `✓ On your Life List · ${new Date(added).toLocaleDateString([], { month: "short", day: "numeric" })}`
+      : "Add to Life List"}</button>
+    <a class="btn" href="${link}" target="_blank" rel="noopener">Photos and info on iNaturalist</a>
+    <a class="btn" href="${sounds}" target="_blank" rel="noopener">Hear Texas recordings</a>`;
   $("sheet").hidden = false;
+  $("sheet").querySelector(".sheet-body").scrollTop = 0;
+}
+
+function toggleLife(label) {
+  if (life[label]) {
+    if (!confirm(`Remove ${nameOf(label)} from your Life List?`)) return;
+    delete life[label];
+  } else life[label] = new Date().toISOString();
+  store.set("life", life);
+  renderLife();
+  openSpecies(label);
 }
 
 // ---------- results ----------
@@ -291,10 +417,25 @@ function renderHeard() {
   $("heard-h").hidden = heard.size === 0;
   $("heard").innerHTML = [...heard.entries()]
     .sort((x, y) => (callingNow.has(y[0]) - callingNow.has(x[0])) || (y[1].last - x[1].last))
-    .map(([l, h]) => `<li class="${callingNow.has(l) ? "flash" : ""}"><button class="sp" data-label="${l}">
-      <span class="sp-name">${nameOf(l)}<em>${h.count} × · best ${Math.round(h.best * 100)}% · ${h.last.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</em></span>${
-      callingNow.has(l) ? `<span class="pill live">calling now</span>` : ""}</button></li>`)
+    .map(([l, h]) => speciesRow(speciesBy[l] || { label: l, name: nameOf(l), scientific: "" },
+      `<span class="sp-meta">${h.count} × · best ${Math.round(h.best * 100)}% · ${h.last.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>${
+      callingNow.has(l) ? `<span class="pill live">calling now</span>` : ""}`).replace("<li>", `<li class="${callingNow.has(l) ? "flash" : ""}">`))
     .join("");
+  updateSessionRow();
+}
+
+function updateSessionRow() {
+  const row = $("session-open");
+  row.classList.toggle("live", !!audio);
+  $("session-open-text").textContent = audio
+    ? "Listening… tap to return"
+    : heard.size ? `Sound ID session · ${heard.size} frog${heard.size === 1 ? "" : "s"} heard` : "Sound ID session";
+}
+
+function showSession(on) {
+  $("home").hidden = on;
+  $("session").hidden = !on;
+  window.scrollTo(0, 0);
 }
 
 // ---------- live listening ----------
@@ -342,8 +483,10 @@ async function startListening() {
   };
   src.connect(proc);
   proc.connect(ctx.destination);
-  $("listen").textContent = "Stop";
   $("listen").classList.add("on");
+  $("listen").setAttribute("aria-label", "Stop");
+  $("listen").innerHTML = `<svg><use href="#i-stop"/></svg>`;
+  updateSessionRow();
   $("now-title").textContent = "Listening…";
   $("now-sub").textContent = "First answer in 3 seconds.";
   drawSpectro();
@@ -355,8 +498,10 @@ function stopListening() {
   audio.stream.getTracks().forEach((t) => t.stop());
   audio.ctx.close();
   audio = null;
-  $("listen").textContent = "Listen";
   $("listen").classList.remove("on");
+  $("listen").setAttribute("aria-label", "Listen");
+  $("listen").innerHTML = `<svg><use href="#i-mic"/></svg>`;
+  updateSessionRow();
 }
 
 function resample(x, from, to) {
@@ -470,39 +615,56 @@ async function analyzeBuffer(arrayBuffer, title) {
 
 // ---------- wiring ----------
 
+function showTab(name) {
+  document.querySelectorAll(".tabbar button").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.id === `tab-${name}`));
+  document.body.dataset.tab = name;
+  window.scrollTo(0, 0);
+}
+
+async function toggleListen() {
+  if (audio) return stopListening();
+  showSession(true);
+  try { await startListening(); } catch (e) {
+    $("now-title").textContent = "Can't use the microphone";
+    $("now-sub").textContent = e.name === "NotAllowedError"
+      ? "Allow microphone access for this site in your browser settings, then try again."
+      : String(e.message || e);
+  }
+}
+
 function setupUI() {
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("active", x === b));
-    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.id === `tab-${b.dataset.tab}`));
-    window.scrollTo(0, 0);
+  document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => {
+    // Tapping Identify again goes back to its home screen.
+    if (b.dataset.tab === "identify" && document.body.dataset.tab === "identify") showSession(false);
+    showTab(b.dataset.tab);
   }));
   document.body.addEventListener("click", (e) => {
-    const sp = e.target.closest(".sp");
-    if (sp) openSpecies(sp.dataset.label);
+    const sp = e.target.closest(".sp, .hero, .cell");
+    if (sp && sp.dataset.label) openSpecies(sp.dataset.label);
+    const lt = e.target.closest("#life-toggle");
+    if (lt) toggleLife(lt.dataset.label);
   });
   $("sheet").addEventListener("click", (e) => {
     if (e.target.id === "sheet" || e.target.classList.contains("sheet-close")) $("sheet").hidden = true;
   });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("sheet").hidden = true; });
 
-  $("listen").addEventListener("click", async () => {
-    if (audio) return stopListening();
-    try { await startListening(); } catch (e) {
-      $("now-title").textContent = "Can't use the microphone";
-      $("now-sub").textContent = e.name === "NotAllowedError"
-        ? "Allow microphone access for this site in your browser settings, then try again."
-        : String(e.message || e);
-    }
-  });
+  $("listen").addEventListener("click", toggleListen);
+  $("listen-home").addEventListener("click", toggleListen);
+  $("session-open").addEventListener("click", () => showSession(true));
+  $("session-back").addEventListener("click", () => showSession(false));
 
+  let sampleAudio = null;
   $("file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     if (!f || !model) return;
     if (sampleAudio) { sampleAudio.pause(); sampleAudio = null; }
+    showSession(true);
     await analyzeBuffer(await f.arrayBuffer(), f.name);
     e.target.value = "";
   });
 
-  let sampleAudio = null;
   $("sample").addEventListener("click", async () => {
     const s = samples[Math.floor(Math.random() * samples.length)];
     // Start playing right away, inside the tap: iPhones only allow sound that a tap starts.
@@ -511,6 +673,7 @@ function setupUI() {
     player.controls = true;
     player.className = "player";
     player.play().catch(() => {}); // if it's blocked, the controls below still work
+    showSession(true);
     const r = await fetch(`samples/${s.file}`);
     await analyzeBuffer(await r.arrayBuffer(), `Sample: ${s.name}`);
     if (player !== sampleAudio) return; // another sample was tapped meanwhile
@@ -520,20 +683,15 @@ function setupUI() {
       The model was trained on this recording, so it's an easy test: it shows the app works, not how accurate it is.</p>`);
   });
 
-  $("use-filter").checked = store.get("useFilter", true);
-  $("use-filter").addEventListener("change", () => { store.set("useFilter", $("use-filter").checked); renderNear(); });
-  $("locate").addEventListener("click", () => {
-    $("near-status").textContent = "Finding you…";
-    navigator.geolocation.getCurrentPosition((pos) => {
-      // Rounded to ~1 km; it's only used on this phone.
-      place = { lat: Math.round(pos.coords.latitude * 100) / 100, lng: Math.round(pos.coords.longitude * 100) / 100 };
-      store.set("place", place);
-      renderNear();
-    }, (err) => { $("near-status").textContent = `Couldn't get your location (${err.message}).`; },
-    { enableHighAccuracy: false, timeout: 15000, maximumAge: 3600e3 });
-  });
-
-  $("filter-note").addEventListener("click", () => document.querySelector('.tabs button[data-tab="near"]').click());
+  $("search").addEventListener("input", renderExplore);
+  $("use-filter").addEventListener("change", () => { useFilter = $("use-filter").checked; store.set("useFilter", useFilter); renderAll(); });
+  $("show-sci").addEventListener("change", () => { showSci = $("show-sci").checked; store.set("showSci", showSci); renderAll(); renderHeard(); });
+  $("locate").addEventListener("click", locate);
+  $("find-locate").addEventListener("click", locate);
+  $("explore-filter").addEventListener("click", () => showTab("settings"));
+  $("filter-note").addEventListener("click", () => showTab("settings"));
+  $("life-info").addEventListener("click", () => alert(
+    "Your Life List is the frogs you've found. Open any frog and tap Add to Life List. It's saved on this phone only."));
   $("threshold").value = String(threshold);
   $("threshold").addEventListener("change", () => { threshold = Number($("threshold").value); store.set("threshold", threshold); });
   $("version").textContent = `Version ${VERSION}`;
@@ -557,7 +715,7 @@ async function setupOffline() {
     await navigator.serviceWorker.ready;
     const saved = await caches.match("model/birdnet_embed.tflite", { ignoreSearch: true });
     status.innerHTML = saved
-      ? `<span class="ok">✓ Saved on this ${standalone ? "Home Screen app" : "browser"}.</span> It works with no signal.`
+      ? `<span class="ok">✓ Saved on this ${standalone ? "Home Screen app" : "browser"}.</span> Works with no signal.`
       : "Saving for offline use once the model has loaded…";
     status.classList.toggle("muted", !saved);
   } catch (e) {
